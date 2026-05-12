@@ -125,7 +125,7 @@ void loop() {
 ```
 
 # CIRCUIT DIAGRAM:
-<img width="720" height="1280" alt="WhatsApp Image 2026-05-12 at 11 43 13 AM" src="https://github.com/user-attachments/assets/294a4289-665a-4181-ada7-27d6b401f3d6" />
+<img width="1302" height="1600" alt="WhatsApp Image 2026-05-12 at 4 53 57 PM" src="https://github.com/user-attachments/assets/37a6eb01-0882-45ba-85ce-95ad3a26b4a8" />
 
 # OUTPUT:
 
