@@ -84,18 +84,13 @@ Update rate: 1 Hz (one reading per second)</br>
 ```
 #include <WiFi.h>
 #include "ThingSpeak.h"
-
 #define Soil_Moisture 34
-
 char ssid[] = "SEC_IOT";
 char pass[] = "sec@3000";
-
 WiFiClient client;
-
 unsigned long myChannelNumber = 3379465;
 const int ChannelField = 1;
 const char * myWriteAPIKey = "KF1MJCN7FSOP6VV4";
-
 const int airValue = 4095;
 const int waterValue = 0;
 int percentage = 0;
@@ -106,7 +101,6 @@ void setup() {
   WiFi.mode(WIFI_STA);
   ThingSpeak.begin(client);
 }
-
 void loop() {
   if(WiFi.status() != WL_CONNECTED)
   {
@@ -120,18 +114,14 @@ void loop() {
     }
     Serial.println("\nconnected.");
   }
-
     int Soil_Value = analogRead(Soil_Moisture);
     percentage = map(Soil_Value, airValue, waterValue, 0,100);
-
     percentage = constrain(percentage, 0,100);
     Serial.println("Soil moisture percenatge");
     Serial.println(percentage);
     ThingSpeak.writeField(myChannelNumber, ChannelField, percentage, myWriteAPIKey);
-
     delay(5000);
 }
-
 ```
 
 # CIRCUIT DIAGRAM:
