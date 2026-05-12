@@ -1,4 +1,6 @@
-# INTERFACING TEMPERATURE SENSOR WITH IOT CONTROLLER AND UPLOADING DATA TO THE CLOUD VIA LORAWAN
+## NAME : STANLEY S
+## REG NO : 212223110054
+# EXP-05 INTERFACING TEMPERATURE SENSOR WITH IOT CONTROLLER AND UPLOADING DATA TO THE CLOUD VIA LORAWAN
 
 # AIM:
 To upload the temperature sensor value in the Things mate using Arduino controller.
@@ -79,10 +81,69 @@ Update rate: 1 Hz (one reading per second)</br>
 ![DHT11-Sensor](https://github.com/user-attachments/assets/69e4670d-6116-4cab-b905-941169d913a5)
 
 # PROGRAM:
+```
+#include <WiFi.h>
+#include "ThingSpeak.h"
+
+#define Soil_Moisture 34
+
+char ssid[] = "SEC_IOT";
+char pass[] = "sec@3000";
+
+WiFiClient client;
+
+unsigned long myChannelNumber = 3379465;
+const int ChannelField = 1;
+const char * myWriteAPIKey = "KF1MJCN7FSOP6VV4";
+
+const int airValue = 4095;
+const int waterValue = 0;
+int percentage = 0;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(Soil_Moisture, INPUT);
+  WiFi.mode(WIFI_STA);
+  ThingSpeak.begin(client);
+}
+
+void loop() {
+  if(WiFi.status() != WL_CONNECTED)
+  {
+    Serial.print("Attempting to connect to SSID");
+    Serial.print(ssid);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+      WiFi.begin(ssid, pass);
+      Serial.print(".");
+      delay(5000);
+    }
+    Serial.println("\nconnected.");
+  }
+
+    int Soil_Value = analogRead(Soil_Moisture);
+    percentage = map(Soil_Value, airValue, waterValue, 0,100);
+
+    percentage = constrain(percentage, 0,100);
+    Serial.println("Soil moisture percenatge");
+    Serial.println(percentage);
+    ThingSpeak.writeField(myChannelNumber, ChannelField, percentage, myWriteAPIKey);
+
+    delay(5000);
+}
+
+```
 
 # CIRCUIT DIAGRAM:
+<img width="720" height="1280" alt="WhatsApp Image 2026-05-12 at 11 43 13 AM" src="https://github.com/user-attachments/assets/294a4289-665a-4181-ada7-27d6b401f3d6" />
 
 # OUTPUT:
+
+### SERIAL MONITOR
+<img width="1920" height="1080" alt="Screenshot 2026-05-12 113949" src="https://github.com/user-attachments/assets/985fa671-62fe-4ba1-aac0-a9be12f5c88e" />
+
+### THINKSPEAK
+<img width="1920" height="1080" alt="Screenshot 2026-05-12 113906" src="https://github.com/user-attachments/assets/30761876-aec7-429e-b7fc-d0f4a30e7dfb" />
 
 # RESULT:
 
