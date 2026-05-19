@@ -1,6 +1,6 @@
 ## NAME : STANLEY S
 ## REG NO : 212223110054
-# EXP-04 INTERFACING TEMPERATURE SENSOR WITH IOT CONTROLLER AND UPLOADING DATA TO THE CLOUD VIA LORAWAN
+# EXP-05 INTERFACING TEMPERATURE SENSOR WITH IOT CONTROLLER AND UPLOADING DATA TO THE CLOUD VIA LORAWAN
 
 # AIM:
 To upload the temperature sensor value in the Things mate using Arduino controller.
@@ -82,58 +82,183 @@ Update rate: 1 Hz (one reading per second)</br>
 
 # PROGRAM:
 ```
-#include <WiFi.h>
-#include "ThingSpeak.h"
-#define Soil_Moisture 34
-char ssid[] = "SEC_IOT";
-char pass[] = "sec@3000";
-WiFiClient client;
-unsigned long myChannelNumber = 3379465;
-const int ChannelField = 1;
-const char * myWriteAPIKey = "KF1MJCN7FSOP6VV4";
-const int airValue = 4095;
-const int waterValue = 0;
-int percentage = 0;
+#include<SoftwareSerial.h>
+#include<Adafruit_Sensor.h>
+#include<DHT.h>
+#include<DHT_U.h>
+
+#define DHTPIN 9
+#define DHTTYPE     DHT11
+
+float DHT11_temp;
+float DHT11_hum;
+
+String inputString="";
+bool stringComplete=false;
+long old_time=millis();
+long new_time;
+long uplink_interval=30000;
+bool time_to_at_recvb=false;
+bool get_LA66_data_status=false;
+bool network_joined_status=false;
+char rxbuff[128];
+uint8_t rxbuff_index=0;
+
+DHT_Unified dht(DHTPIN,DHTTYPE);
+SoftwareSerial ss(10,11);
+void HC04();
 
 void setup() {
-  Serial.begin(115200);
-  pinMode(Soil_Moisture, INPUT);
-  WiFi.mode(WIFI_STA);
-  ThingSpeak.begin(client);
+  // put your setup code here, to run once:
+  dht.begin();
+  Serial.begin(9600);
+  ss.begin(9600);
+  ss.listen();
+
+  inputString.reserve(200);
+  sensor_t sensor;
+  ss.println("ATZ");
+  dht.temperature().getSensor(&sensor);
+  dht.humidity().getSensor(&sensor);
+}
+
+void HC04() {
+  sensors_event_t event;
+  dht.temperature().getEvent(&event);
+  if(isnan(event.temperature)){
+    Serial.println(F("Error reading temperature!"));
+    DHT11_temp=327.67;
+  }
+  else{
+    DHT11_temp=event.temperature;
+
+    if(DHT11_temp>60){
+      DHT11_temp=60;
+    }
+    else if(DHT11_temp<-20){
+      DHT11_temp=-20;
+    }
+  }
+  dht.humidity().getEvent(&event);
+  if(isnan(event.relative_humidity)){
+    DHT11_hum=327.67;
+    Serial.println(F("Error reading humidity!"));
+  }
+  else{
+    DHT11_hum=event.relative_humidity;
+
+    if(DHT11_hum>100){
+      DHT11_hum=100;
+    }
+    else if(DHT11_hum<0){
+      DHT11_hum=0;
+    }
+  }
+  Serial.print(F("Temperature: "));
+  Serial.print(DHT11_temp);
+  Serial.println(F("C"));
+  Serial.print(F("Humidity: "));
+  Serial.print(DHT11_hum);
+  Serial.println(F("%"));
+  // put your main code here, to run repeatedly:
+
 }
 void loop() {
-  if(WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print("Attempting to connect to SSID");
-    Serial.print(ssid);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-      WiFi.begin(ssid, pass);
-      Serial.print(".");
-      delay(5000);
-    }
-    Serial.println("\nconnected.");
+  new_time = millis();
+
+  if((new_time-old_time>=uplink_interval)&&(network_joined_status==1)){
+    old_time = new_time;
+    get_LA66_data_status=false;
+    HC04();
+  // Get temperature event and print its value.
+    char sensor_data_buff[128]="\0";
+    snprintf(sensor_data_buff,128,"AT+SENDB=%d,%d,%d,%02X%02X%02X%02X",0,2,4,(short)(DHT11_temp*100)>>8 & 0xFF,(short)(DHT11_temp*100) & 0xFF,(short)(DHT11_hum*100)>>8 & 0xFF,(short)(DHT11_hum*100) & 0xFF);
+    ss.println(sensor_data_buff);
   }
-    int Soil_Value = analogRead(Soil_Moisture);
-    percentage = map(Soil_Value, airValue, waterValue, 0,100);
-    percentage = constrain(percentage, 0,100);
-    Serial.println("Soil moisture percenatge");
-    Serial.println(percentage);
-    ThingSpeak.writeField(myChannelNumber, ChannelField, percentage, myWriteAPIKey);
-    delay(5000);
+
+  if(time_to_at_recvb==true){
+    time_to_at_recvb=false;
+    get_LA66_data_status=true;
+    delay(1000);
+    ss.println("AT+CFG");    
+  }
+
+    while ( ss.available()) {
+    // get the new byte:
+    char inChar = (char) ss.read();
+    // add it to the inputString:
+    inputString += inChar;
+    rxbuff[rxbuff_index++]=inChar;
+    if(rxbuff_index>128)
+    break;
+    
+    // if the incoming character is a newline, set a flag so the main loop can
+    // do something about it:
+    if (inChar == '\n' || inChar == '\r') {
+      stringComplete = true;
+      rxbuff[rxbuff_index]='\0';
+      if(strncmp(rxbuff,"JOINED",6)==0){
+        network_joined_status=1;
+      }
+
+      if(strncmp(rxbuff,"Dragino LA66 Device",19)==0){
+        network_joined_status=0;
+      }
+
+      if(strncmp(rxbuff,"Run AT+RECVB=? to see detail",28)==0){
+        time_to_at_recvb=true;
+        stringComplete=false;
+        inputString = "\0";
+      }
+
+      if(strncmp(rxbuff,"AT+RECVB=",9)==0){       
+        stringComplete=false;
+        inputString = "\0";
+        Serial.print("\r\nGet downlink data(FPort & Payload) ");
+        Serial.println(&rxbuff[9]);
+      } 
+      rxbuff_index=0;
+
+      if(get_LA66_data_status==true){
+        stringComplete=false;
+        inputString = "\0";
+      }
+    }
+  }
+   while ( Serial.available()) {
+    // get the new byte:
+    char inChar = (char) Serial.read();
+    // add it to the inputString:
+    inputString += inChar;
+    // if the incoming character is a newline, set a flag so the main loop can
+    // do something about it:
+    if (inChar == '\n' || inChar == '\r') {
+      ss.print(inputString);
+      inputString = "\0";
+    }
+  }
+  // print the string when a newline arrives:
+  if (stringComplete) {
+    Serial.print(inputString);
+    
+    // clear the string:
+    inputString = "\0";
+    stringComplete = false;
+  }
 }
 ```
 
 # CIRCUIT DIAGRAM:
-<img width="1302" height="1600" alt="WhatsApp Image 2026-05-12 at 4 53 57 PM" src="https://github.com/user-attachments/assets/37a6eb01-0882-45ba-85ce-95ad3a26b4a8" />
+<img width="900" height="1600" alt="WhatsApp Image 2026-05-18 at 2 49 06 PM" src="https://github.com/user-attachments/assets/52817592-c39b-4c49-a2c0-80cea1908b35" />
+
 
 # OUTPUT:
+## SERIAL MONITOR:
+<img width="1920" height="1080" alt="Screenshot 2026-05-18 142457" src="https://github.com/user-attachments/assets/728c6f24-0e6a-4795-b847-c80040e7e1e7" />
 
-### SERIAL MONITOR
-<img width="1920" height="1080" alt="Screenshot 2026-05-12 113949" src="https://github.com/user-attachments/assets/985fa671-62fe-4ba1-aac0-a9be12f5c88e" />
+## DASHBOARD:
+<img width="1920" height="1080" alt="Screenshot 2026-05-18 143456" src="https://github.com/user-attachments/assets/825236ce-aa84-4e04-aa4c-10a86340aec1" />
 
-### THINKSPEAK
-<img width="1920" height="1080" alt="Screenshot 2026-05-12 113906" src="https://github.com/user-attachments/assets/30761876-aec7-429e-b7fc-d0f4a30e7dfb" />
 
 # RESULT:
 
