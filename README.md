@@ -247,6 +247,17 @@ void loop() {
   }
 }
 ```
+# UPLINK FORMATTER:
+```
+function Decoder(bytes, port) {
+    var Temperature = (bytes[0] << 8 | bytes[1]) / 100;
+    var Humidity = (bytes[2] << 8 | bytes[3]) / 100;
+    return {
+        Temperature: Temperature,
+        Humidity: Humidity
+    }
+};
+```
 
 # CIRCUIT DIAGRAM:
 <img width="900" height="1600" alt="WhatsApp Image 2026-05-18 at 2 49 06 PM" src="https://github.com/user-attachments/assets/52817592-c39b-4c49-a2c0-80cea1908b35" />
